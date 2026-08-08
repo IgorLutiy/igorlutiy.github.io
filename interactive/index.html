@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>RUTYPE — тренажёр слепой печати</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== MENU ===== -->
+  <section id="menu-screen" class="screen active">
+    <div class="brand-kicker">тренажёр слепой печати</div>
+    <h1 class="brand-title">RUTYPE<span class="cursor">_</span></h1>
+    <div class="brand-sub">набирай слова, пока они не долетели до корабля</div>
+
+    <div class="nick-row">
+      <label for="nickname">ник</label>
+      <input id="nickname" maxlength="16" placeholder="игрок">
+    </div>
+
+    <nav class="menu-links">
+      <button class="menu-link primary" data-action="start">новая игра</button>
+      <button class="menu-link" data-action="start-endless">бесконечная тренировка</button>
+      <button class="menu-link" data-action="open-settings">настройки</button>
+      <button class="menu-link" data-action="open-records">рекорды</button>
+      <button class="menu-link" data-action="open-customtext">мои тексты</button>
+    </nav>
+  </section>
+
+  <!-- ===== GAME ===== -->
+  <section id="game-screen" class="screen">
+    <div id="hud-top">
+      <div class="hud-left">
+        <button class="icon-btn" data-action="pause" title="пауза">❚❚</button>
+        <button class="icon-btn" id="stop-endless-btn" data-action="stop-endless" title="закончить тренировку" style="display:none">⏹</button>
+      </div>
+      <div class="hud-right">
+        <div class="hud-score" id="hud-score">0</div>
+        <div class="hud-level" id="hud-level">УРОВЕНЬ 1</div>
+        <div class="hud-lives" id="hud-lives"></div>
+      </div>
+    </div>
+
+    <div id="field">
+      <svg id="laser-layer"></svg>
+      <div id="ship">🚀</div>
+    </div>
+
+    <div id="hud-bottom">
+      <div>печатай слова, чтобы стрелять · ENTER — импульс EMP</div>
+      <div class="emp-bar-track"><div class="emp-bar-fill" id="emp-fill"></div></div>
+    </div>
+  </section>
+
+  <!-- ===== PAUSE OVERLAY ===== -->
+  <section id="pause-overlay" class="overlay">
+    <h2>пауза</h2>
+    <div class="btn-row">
+      <button class="btn" data-action="resume">продолжить</button>
+      <button class="btn ghost" data-action="quit-to-menu">в меню</button>
+    </div>
+  </section>
+
+  <!-- ===== GAME OVER / TRAINING SUMMARY OVERLAY ===== -->
+  <section id="gameover-overlay" class="overlay">
+    <h2 id="go-title">корабль повреждён</h2>
+    <div class="stat-row">счёт: <b id="go-score">0</b></div>
+    <div class="stat-row" id="go-level-row">уровень: <b id="go-level">1</b></div>
+    <div class="stat-row">точность: <b id="go-accuracy">100%</b></div>
+    <div class="stat-row">скорость: <b id="go-wpm">0</b> зн/мин</div>
+    <div id="go-rank" class="stat-row"></div>
+    <div id="go-letters" class="letter-map"></div>
+    <div class="btn-row">
+      <button class="btn" data-action="restart" id="go-restart-btn">ещё раз</button>
+      <button class="btn ghost" data-action="quit-to-menu">в меню</button>
+    </div>
+  </section>
+
+  <!-- ===== RECORD DETAIL OVERLAY ===== -->
+  <section id="record-detail-overlay" class="overlay">
+    <h2>результат</h2>
+    <div class="stat-row" id="rd-name-date"></div>
+    <div class="stat-row">счёт: <b id="rd-score">0</b></div>
+    <div class="stat-row">уровень: <b id="rd-level">1</b></div>
+    <div class="stat-row">точность: <b id="rd-accuracy">100%</b></div>
+    <div class="stat-row">скорость: <b id="rd-wpm">0</b> зн/мин</div>
+    <div id="rd-letters" class="letter-map"></div>
+    <div class="btn-row">
+      <button class="btn ghost" data-action="close-overlay">закрыть</button>
+    </div>
+  </section>
+
+  <!-- ===== RECORDS OVERLAY ===== -->
+  <section id="records-overlay" class="overlay">
+    <h2>рекорды</h2>
+    <table class="records-table">
+      <thead><tr><th></th><th>ник</th><th style="text-align:right">очки</th></tr></thead>
+      <tbody id="records-body"></tbody>
+    </table>
+    <div id="records-empty" class="records-empty" style="display:none">пока пусто — сыграй первым</div>
+    <div class="btn-row">
+      <button class="btn ghost" data-action="close-overlay">закрыть</button>
+    </div>
+  </section>
+
+  <!-- ===== SETTINGS OVERLAY ===== -->
+  <section id="settings-overlay" class="overlay">
+    <h2>настройки</h2>
+    <form class="settings-form" id="settings-form">
+      <label>язык слов
+        <select id="set-lang"></select>
+      </label>
+      <label>начальная скорость
+        <select id="set-speed">
+          <option value="0.7">медленно</option>
+          <option value="1">обычно</option>
+          <option value="1.35">быстро</option>
+        </select>
+      </label>
+      <label>сложность слов
+        <span class="tier-checks">
+          <label><input type="checkbox" data-tier="1" checked> короткие</label>
+          <label><input type="checkbox" data-tier="2" checked> средние</label>
+          <label><input type="checkbox" data-tier="3"> длинные</label>
+          <label><input type="checkbox" data-tier="4"> фразы</label>
+        </span>
+      </label>
+      <label>жизни
+        <select id="set-lives">
+          <option value="1">1</option>
+          <option value="3" selected>3</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="set-strict"> строгий режим (ошибка красным, лишнюю букву стирать backspace)
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:8px;">
+        <input type="checkbox" id="set-sound" checked> звук выстрелов
+      </label>
+    </form>
+    <div class="btn-row">
+      <button class="btn" data-action="save-settings">сохранить</button>
+      <button class="btn ghost" data-action="close-overlay">закрыть</button>
+    </div>
+  </section>
+
+  <!-- ===== CUSTOM TEXT OVERLAY ===== -->
+  <section id="customtext-overlay" class="overlay">
+    <h2>мои тексты</h2>
+    <div class="stat-row" style="max-width:320px;">вставь любой текст — он разобьётся на слова и короткие фразы и появится как язык «свой текст» в настройках</div>
+    <textarea id="custom-text-input" class="custom-textarea" placeholder="вставь текст сюда…"></textarea>
+    <div id="custom-text-status" class="stat-row"></div>
+    <div class="btn-row">
+      <button class="btn" data-action="save-customtext">сохранить</button>
+      <button class="btn ghost" data-action="clear-customtext">очистить</button>
+      <button class="btn ghost" data-action="close-overlay">закрыть</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="words-ru.js"></script>
+<script src="words-en.js"></script>
+<script src="words-uk.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интерактивные проекты | Игорь Лютый</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: var(--text-main);
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-color);
+            box-shadow: 0 10px 25px -5px rgba(56, 189, 248, 0.1);
+        }
+
+        .card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 10px;
+            color: var(--accent-color);
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+        }
+
+        .card-footer {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Мои интерактивные проекты</h1>
+            <p>Коллекция утилит, тренажеров и веб-экспериментов</p>
+        </header>
+
+        <main class="grid">
+            <!-- Карточка проекта 1 Rutype -->
+            <a href="interactive/rutype/" class="card">
+                <div>
+                    <h3>RUTYPE_</h3>
+                    <p>Тренажёр слепой печати.</p>
+                </div>
+                <div class="card-footer">Открыть проект &rarr;</div>
+            </a>
+
+            <!-- Карточка проекта 2 (Заглушка) -->
+            <a href="leaderboard/index.html" class="card">
+                <div>
+                    <h3>Тренажер кодинга</h3>
+                    <p>Интерактивный инструмент для практики команд и синтаксиса.</p>
+                </div>
+                <div class="card-footer">Открыть проект &rarr;</div>
+            </a>
+
+            <!-- Карточка проекта 3 (Заглушка) -->
+            <a href="lighthouse/index.html" class="card">
+                <div>
+                    <h3>Симулятор маяка</h3>
+                    <p>Аудио-реактивная графическая визуализация световых циклов.</p>
+                </div>
+                <div class="card-footer">Открыть проект &rarr;</div>
+            </a>
+
+            <!-- Карточка проекта 4 (Заглушка для нового инструмента) -->
+            <a href="project-four/index.html" class="card">
+                <div>
+                    <h3>Проект №4</h3>
+                    <p>Здесь будет описание вашего нового инструмента или игры.</p>
+                </div>
+                <div class="card-footer">Открыть проект &rarr;</div>
+            </a>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 IgorLutiy. Собрано на GitHub Pages.</p>
+        </footer>
+    </div>
+
+</body>
+</html>

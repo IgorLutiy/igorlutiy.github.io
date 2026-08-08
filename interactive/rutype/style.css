@@ -331,6 +331,11 @@ html, body {
   font-size: 14px;
 }
 .overlay .stat-row b { color: var(--cyan); font-size: 16px; }
+#go-rank {
+  max-width: 260px;
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 .btn {
   font-family: var(--font-ui);
@@ -378,6 +383,13 @@ html, body {
 }
 .tier-checks { display: flex; gap: 12px; flex-wrap: wrap; }
 .tier-checks label { flex-direction: row; align-items: center; gap: 6px; font-size: 12px; }
+.settings-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
 
 /* ---------- Records table ---------- */
 .records-table {
@@ -401,6 +413,50 @@ html, body {
 .records-table tr.record-row:hover td { color: var(--cyan); }
 .records-table tr.record-row:hover td.score { color: var(--amber); }
 .records-empty { color: var(--text-dim); font-size: 13px; }
+
+.records-lang-switch {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.records-lang-switch button {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  background: none;
+  border: 1px solid rgba(140,160,255,0.2);
+  color: var(--text-dim);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.records-lang-switch button:hover { color: var(--text-main); border-color: var(--cyan); }
+.records-lang-switch button.active {
+  color: #0a0e1c;
+  background: var(--cyan);
+  border-color: var(--cyan);
+  font-weight: 600;
+}
+.records-note {
+  max-width: 280px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  text-align: center;
+}
+.records-source {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  letter-spacing: 0.03em;
+}
+.records-loading td {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 10px 0;
+}
 
 /* ---------- Record detail must sit above the records list overlay ---------- */
 #record-detail-overlay { z-index: 11; }

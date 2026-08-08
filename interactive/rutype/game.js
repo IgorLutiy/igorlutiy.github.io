@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // Заполни адресом веб-приложения Apps Script после деплоя (см. apps-script/README.md).
+  // Пока строка пустая, таблица рекордов работает только локально (localStorage) —
+  // ничего не ломается, просто результаты не видны на других устройствах.
+  const LEADERBOARD_URL = "https://script.google.com/macros/s/AKfycbwkyipNq8l2QLc0U_jL5aW95-K-BZLoFpwba_nSAUJ2L_4bEvjvgjXCcX-72qkJkt3I/exec";
+
   // ---------- DOM ----------
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -37,7 +42,7 @@
   const DEFAULT_SETTINGS = {
     lang: "ru",
     speed: 1,
-    tiers: [1, 2],
+    tiers: [1, 2, 3],
     lives: 3,
     strict: false,
     sound: true,
@@ -55,18 +60,73 @@
   function saveSettings(s) {
     localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(s));
   }
-  function loadLeaderboard() {
+  function loadLocalLeaderboard() {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEYS.leaderboard)) || [];
+      const raw = JSON.parse(localStorage.getItem(STORAGE_KEYS.leaderboard));
+      if (!raw) return {};
+      // миграция со старого формата (плоский массив без разбивки по языкам)
+      if (Array.isArray(raw)) {
+        const migrated = { ru: raw };
+        saveLocalLeaderboard(migrated);
+        return migrated;
+      }
+      return raw;
     } catch {
-      return [];
+      return {};
     }
   }
-  function saveLeaderboard(list) {
-    localStorage.setItem(STORAGE_KEYS.leaderboard, JSON.stringify(list));
+  function saveLocalLeaderboard(byLang) {
+    localStorage.setItem(STORAGE_KEYS.leaderboard, JSON.stringify(byLang));
   }
 
-  // ---------- custom text -> word bank ----------
+  // ---------- стандартные настройки для общего рейтинга ----------
+  // обычная скорость, 3 жизни, слова "короткие+средние+длинные",
+  // фразы можно добавить дополнительно — на результат они принципиально не влияют
+  function isStandardRun(s) {
+    if (!s) return false;
+    if (s.lives !== 3) return false;
+    if (s.speed !== 1) return false;
+    const t = new Set(s.tiers || []);
+    if (!(t.has(1) && t.has(2) && t.has(3))) return false;
+    if (t.has(4) && t.size !== 4) return false;
+    if (!t.has(4) && t.size !== 3) return false;
+    return true;
+  }
+
+  // ---------- онлайн-таблица рекордов (Google Apps Script) ----------
+  // При успехе возвращает { ok:true, rank } / { ok:true, entries }.
+  // При любой проблеме (не настроено, нет сети, скрипт недоступен) — null,
+  // и вызывающий код тихо откатывается на localStorage.
+  async function fetchOnlineTop(lang, limit) {
+    if (!LEADERBOARD_URL) return null;
+    try {
+      const url = `${LEADERBOARD_URL}?lang=${encodeURIComponent(lang)}&limit=${limit}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      return data && data.ok ? data.entries : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function postOnlineScore(lang, entry) {
+    if (!LEADERBOARD_URL) return null;
+    try {
+      // Content-Type: text/plain — осознанно, чтобы избежать CORS-preflight,
+      // который Apps Script не поддерживает. Тело всё равно валидный JSON.
+      const res = await fetch(LEADERBOARD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ lang, ...entry }),
+      });
+      const data = await res.json();
+      return data && data.ok ? data : null;
+    } catch {
+      return null;
+    }
+  }
+
+
   function splitCustomText(raw) {
     const sentences = raw
       .split(/[\n.!?;:]+/)
@@ -181,20 +241,63 @@
 
   // ---------- records UI ----------
   let currentRecordsList = [];
-  function renderRecords() {
-    const list = loadLeaderboard()
-      .slice()
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
-    currentRecordsList = list;
+  let currentRecordsLang = null;
+
+  function availableLeaderboardLangs() {
+    return Object.keys(window.WORD_BANKS || {}).filter((code) => code !== "custom");
+  }
+
+  function renderLangSwitch() {
+    const box = $("#records-lang-switch");
+    box.innerHTML = "";
+    availableLeaderboardLangs().forEach((code) => {
+      const bank = window.WORD_BANKS[code];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = bank.label || code;
+      btn.className = code === currentRecordsLang ? "active" : "";
+      btn.addEventListener("click", () => {
+        currentRecordsLang = code;
+        renderRecords();
+      });
+      box.appendChild(btn);
+    });
+  }
+
+  async function renderRecords() {
+    const langs = availableLeaderboardLangs();
+    if (!currentRecordsLang || !langs.includes(currentRecordsLang)) {
+      // по умолчанию открываем язык, с которым сейчас играют, если это настоящий банк слов
+      currentRecordsLang = langs.includes(settings.lang) ? settings.lang : langs[0];
+    }
+    renderLangSwitch();
+
+    const requestedLang = currentRecordsLang; // на случай, если за время запроса язык переключат
     const body = $("#records-body");
     const empty = $("#records-empty");
+    const badge = $("#records-source");
+    empty.style.display = "none";
+    body.innerHTML = `<tr><td colspan="3" class="records-loading">загрузка…</td></tr>`;
+    badge.textContent = "";
+
+    let list = await fetchOnlineTop(requestedLang, 10);
+    let source = "online";
+    if (!list) {
+      const boardLocal = loadLocalLeaderboard();
+      list = (boardLocal[requestedLang] || []).slice().sort((a, b) => b.score - a.score).slice(0, 10);
+      source = LEADERBOARD_URL ? "offline" : "local";
+    }
+
+    if (requestedLang !== currentRecordsLang) return; // язык уже переключили, этот ответ устарел
+
+    currentRecordsList = list;
     body.innerHTML = "";
+    badge.textContent =
+      source === "online" ? "онлайн-таблица" : source === "offline" ? "офлайн (нет связи с сервером)" : "локально на этом устройстве";
     if (!list.length) {
       empty.style.display = "block";
       return;
     }
-    empty.style.display = "none";
     list.forEach((entry, i) => {
       const tr = document.createElement("tr");
       tr.className = "record-row";
@@ -209,15 +312,21 @@
     return div.innerHTML;
   }
 
-  function submitScore(entry) {
-    const list = loadLeaderboard();
+  async function submitScore(lang, entry) {
+    const online = await postOnlineScore(lang, entry);
+    if (online) {
+      return { rank: online.rank, online: true };
+    }
+    // сети нет / скрипт не настроен / Google на секунду недоступен — пишем локально,
+    // чтобы результат хотя бы не потерялся на этом устройстве
+    const board = loadLocalLeaderboard();
+    const list = board[lang] || [];
     list.push(entry);
     list.sort((a, b) => b.score - a.score);
     const trimmed = list.slice(0, 50);
-    saveLeaderboard(trimmed);
-    // Точка расширения: если появится онлайн-таблица (Google Apps Script),
-    // здесь же можно сделать fetch(LEADERBOARD_URL, {method:'POST', body: JSON.stringify(entry)})
-    return trimmed.indexOf(entry) + 1;
+    board[lang] = trimmed;
+    saveLocalLeaderboard(board);
+    return { rank: trimmed.indexOf(entry) + 1, online: false };
   }
 
   function openRecordDetail(entry) {
@@ -368,6 +477,10 @@
       paused: false,
       over: false,
       nextId: 1,
+      // снимок настроек на момент старта — именно по нему проверяем
+      // право результата попасть в общий рейтинг (настройки могут
+      // измениться позже, а прошедший раунд не должен пересчитываться)
+      runSettings: { ...settings },
     };
   }
 
@@ -605,7 +718,7 @@
     showResultsOverlay(false);
   }
 
-  function showResultsOverlay(competitive) {
+  async function showResultsOverlay(competitive) {
     const elapsedMin = Math.max(0.05, (performance.now() - G.startedAt) / 60000);
     const totalKeys = G.correctKeys + G.missedKeys;
     const accuracy = totalKeys ? Math.round((G.correctKeys / totalKeys) * 100) : 100;
@@ -622,18 +735,31 @@
 
     if (competitive) {
       const nick = localStorage.getItem(STORAGE_KEYS.nickname) || "игрок";
-      const entry = {
-        name: nick,
-        score: G.score,
-        level: G.level,
-        accuracy,
-        cpm,
-        letterMisses: G.letterMisses,
-        lang: settings.lang,
-        date: Date.now(),
-      };
-      const rank = submitScore(entry);
-      $("#go-rank").textContent = rank && rank <= 10 ? `место в рекордах: ${rank}` : "";
+      const runLang = G.runSettings.lang;
+      const eligible = runLang !== "custom" && isStandardRun(G.runSettings);
+      if (eligible) {
+        const entry = {
+          name: nick,
+          score: G.score,
+          level: G.level,
+          accuracy,
+          cpm,
+          letterMisses: G.letterMisses,
+          lang: runLang,
+          date: Date.now(),
+        };
+        $("#go-rank").textContent = "сохраняем результат…";
+        showOverlay("gameover"); // не заставляем ждать сеть, чтобы увидеть остальные цифры
+        const { rank, online } = await submitScore(runLang, entry);
+        const place = rank && rank <= 10 ? `место в рекордах: ${rank}` : "результат сохранён";
+        $("#go-rank").textContent = online ? place : `${place} (офлайн, синхронизируется только на этом устройстве)`;
+        return;
+      } else if (runLang === "custom") {
+        $("#go-rank").textContent = "свой текст не участвует в общем рейтинге";
+      } else {
+        $("#go-rank").textContent =
+          "результат не попал в общий рейтинг — включи стандартные настройки (обычная скорость, 3 жизни, короткие+средние+длинные слова)";
+      }
     } else {
       $("#go-rank").textContent = `пропущено слов: ${G.missedWords || 0}`;
     }
@@ -816,6 +942,11 @@
       case "save-settings":
         readSettingsFromForm();
         hideOverlay("settings");
+        break;
+      case "reset-settings":
+        settings = { ...DEFAULT_SETTINGS };
+        saveSettings(settings);
+        applySettingsToForm();
         break;
       case "open-records":
         renderRecords();

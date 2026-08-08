@@ -97,11 +97,14 @@
   <!-- ===== RECORDS OVERLAY ===== -->
   <section id="records-overlay" class="overlay">
     <h2>рекорды</h2>
+    <div class="records-lang-switch" id="records-lang-switch"></div>
+    <div class="records-source" id="records-source"></div>
     <table class="records-table">
       <thead><tr><th></th><th>ник</th><th style="text-align:right">очки</th></tr></thead>
       <tbody id="records-body"></tbody>
     </table>
     <div id="records-empty" class="records-empty" style="display:none">пока пусто — сыграй первым</div>
+    <div class="records-note">в зачёт идут игры со стандартными настройками: обычная скорость, 3 жизни, короткие+средние+длинные слова (можно + фразы)</div>
     <div class="btn-row">
       <button class="btn ghost" data-action="close-overlay">закрыть</button>
     </div>
@@ -125,9 +128,10 @@
         <span class="tier-checks">
           <label><input type="checkbox" data-tier="1" checked> короткие</label>
           <label><input type="checkbox" data-tier="2" checked> средние</label>
-          <label><input type="checkbox" data-tier="3"> длинные</label>
+          <label><input type="checkbox" data-tier="3" checked> длинные</label>
           <label><input type="checkbox" data-tier="4"> фразы</label>
         </span>
+        <span class="settings-hint">в общий рейтинг попадают игры с обычной скоростью, 3 жизнями и словами «короткие + средние + длинные» (фразы можно включить дополнительно)</span>
       </label>
       <label>жизни
         <select id="set-lives">
@@ -145,6 +149,7 @@
     </form>
     <div class="btn-row">
       <button class="btn" data-action="save-settings">сохранить</button>
+      <button class="btn ghost" data-action="reset-settings">сбросить по умолчанию</button>
       <button class="btn ghost" data-action="close-overlay">закрыть</button>
     </div>
   </section>

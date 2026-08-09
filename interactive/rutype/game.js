@@ -97,10 +97,10 @@
   // При успехе возвращает { ok:true, rank } / { ok:true, entries }.
   // При любой проблеме (не настроено, нет сети, скрипт недоступен) — null,
   // и вызывающий код тихо откатывается на localStorage.
-  async function fetchOnlineTop(lang, limit) {
+  async function fetchOnlineTop(lang, limit, period) {
     if (!LEADERBOARD_URL) return null;
     try {
-      const url = `${LEADERBOARD_URL}?lang=${encodeURIComponent(lang)}&limit=${limit}`;
+      const url = `${LEADERBOARD_URL}?lang=${encodeURIComponent(lang)}&limit=${limit}&period=${period}`;
       const res = await fetch(url);
       const data = await res.json();
       return data && data.ok ? data.entries : null;
@@ -242,6 +242,7 @@
   // ---------- records UI ----------
   let currentRecordsList = [];
   let currentRecordsLang = null;
+  let currentRecordsPeriod = "day"; // по умолчанию суточная — там у новичков есть шанс попасть в топ
 
   function availableLeaderboardLangs() {
     return Object.keys(window.WORD_BANKS || {}).filter((code) => code !== "custom");
@@ -264,6 +265,31 @@
     });
   }
 
+  function renderPeriodSwitch() {
+    const box = $("#records-period-switch");
+    box.innerHTML = "";
+    [
+      ["day", "за сутки"],
+      ["all", "за всё время"],
+    ].forEach(([value, label]) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = label;
+      btn.className = value === currentRecordsPeriod ? "active" : "";
+      btn.addEventListener("click", () => {
+        currentRecordsPeriod = value;
+        renderRecords();
+      });
+      box.appendChild(btn);
+    });
+  }
+
+  function filterByPeriodLocal(list, period) {
+    if (period !== "day") return list;
+    const since = Date.now() - 24 * 60 * 60 * 1000;
+    return list.filter((e) => e.date && e.date >= since);
+  }
+
   async function renderRecords() {
     const langs = availableLeaderboardLangs();
     if (!currentRecordsLang || !langs.includes(currentRecordsLang)) {
@@ -271,8 +297,10 @@
       currentRecordsLang = langs.includes(settings.lang) ? settings.lang : langs[0];
     }
     renderLangSwitch();
+    renderPeriodSwitch();
 
-    const requestedLang = currentRecordsLang; // на случай, если за время запроса язык переключат
+    const requestedLang = currentRecordsLang; // на случай, если за время запроса язык/период переключат
+    const requestedPeriod = currentRecordsPeriod;
     const body = $("#records-body");
     const empty = $("#records-empty");
     const badge = $("#records-source");
@@ -280,15 +308,16 @@
     body.innerHTML = `<tr><td colspan="3" class="records-loading">загрузка…</td></tr>`;
     badge.textContent = "";
 
-    let list = await fetchOnlineTop(requestedLang, 10);
+    let list = await fetchOnlineTop(requestedLang, 10, requestedPeriod);
     let source = "online";
     if (!list) {
       const boardLocal = loadLocalLeaderboard();
-      list = (boardLocal[requestedLang] || []).slice().sort((a, b) => b.score - a.score).slice(0, 10);
+      const all = (boardLocal[requestedLang] || []).slice().sort((a, b) => b.score - a.score);
+      list = filterByPeriodLocal(all, requestedPeriod).slice(0, 10);
       source = LEADERBOARD_URL ? "offline" : "local";
     }
 
-    if (requestedLang !== currentRecordsLang) return; // язык уже переключили, этот ответ устарел
+    if (requestedLang !== currentRecordsLang || requestedPeriod !== currentRecordsPeriod) return; // устаревший ответ
 
     currentRecordsList = list;
     body.innerHTML = "";
@@ -296,6 +325,8 @@
       source === "online" ? "онлайн-таблица" : source === "offline" ? "офлайн (нет связи с сервером)" : "локально на этом устройстве";
     if (!list.length) {
       empty.style.display = "block";
+      empty.textContent =
+        requestedPeriod === "day" ? "за последние сутки пока пусто — сыграй первым" : "пока пусто — сыграй первым";
       return;
     }
     list.forEach((entry, i) => {

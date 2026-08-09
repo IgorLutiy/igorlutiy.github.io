@@ -421,7 +421,8 @@ html, body {
   justify-content: center;
   margin-bottom: 6px;
 }
-.records-lang-switch button {
+.records-lang-switch button,
+.records-period-switch button {
   font-family: var(--font-ui);
   font-size: 12px;
   background: none;
@@ -431,11 +432,24 @@ html, body {
   border-radius: 999px;
   cursor: pointer;
 }
-.records-lang-switch button:hover { color: var(--text-main); border-color: var(--cyan); }
+.records-lang-switch button:hover,
+.records-period-switch button:hover { color: var(--text-main); border-color: var(--cyan); }
 .records-lang-switch button.active {
   color: #0a0e1c;
   background: var(--cyan);
   border-color: var(--cyan);
+  font-weight: 600;
+}
+.records-period-switch {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.records-period-switch button.active {
+  color: #1a1206;
+  background: var(--amber);
+  border-color: var(--amber);
   font-weight: 600;
 }
 .records-note {

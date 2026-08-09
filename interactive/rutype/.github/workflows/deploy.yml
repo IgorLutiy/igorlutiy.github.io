@@ -1,0 +1,28 @@
+name: Deploy to Main Site
+
+on:
+  push:
+    branches: [ main, master ] # Срабатывает при любом изменении в коде проекта
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project repo
+        uses: actions/checkout@v4
+
+      - name: Pushes to main site repository
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.GH_TOKEN }}
+        with:
+          source-directory: '.' # Какие файлы отправляем (все)
+          destination-github-username: 'IgorLutiy'
+          destination-repository-name: 'igorlutiy.github.io'
+          user-email: '35736450+IgorLutiy@users.noreply.github.com' # Ваша почта на GitHub
+          user-name: 'IgorLutiy' # Ваш логин
+          target-branch: 'main'
+          target-directory: 'interactive/rutype' # Папка на главном сайте, куда складывать проект
+          commit-message: 'Auto-update project from source repo'
+          # Исключаем файлы, которые не должны лететь на сайт:
+          exclude: "README.md, LICENSE, .gitignore, .github/"

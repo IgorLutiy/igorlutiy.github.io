@@ -1,3 +1,6 @@
+// ===== Версия =====
+const GAME_VERSION = '1.0';
+
 // ===== Состояние игры =====
 const state = {
   lang: 'ru',
@@ -10,10 +13,22 @@ const state = {
   score: 0,
   round: 0,
   wordsSolved: 0,
+  wrongAttempts: 0,
+  hintsUsed: 0,
   startTime: null,
   timerInterval: null,
   maxRounds: 10,
   bestScore: Number(localStorage.getItem('wordGameBest') || 0)
+};
+
+// ===== Очки =====
+// Правильный ответ: + (длина × 10)
+// Неверная попытка: −10
+// Подсказка: −15
+const POINTS = {
+  correctBase: 10,   // умножается на длину слова
+  wrong: -10,
+  hint: -15
 };
 
 // ===== DOM =====
@@ -53,8 +68,16 @@ function setFeedback(text, type = '') {
   el.className = 'feedback ' + type;
 }
 
+function updateScoreDisplay() {
+  $('#score').textContent = state.score;
+}
+
 // ===== Инициализация =====
 function init() {
+  // Версия
+  const versionEl = document.getElementById('gameVersion');
+  if (versionEl) versionEl.textContent = 'v' + GAME_VERSION;
+
   // Языки
   const langSelect = $('#langSelect');
   getAvailableLanguages().forEach(lang => {
@@ -93,7 +116,6 @@ function init() {
   input.addEventListener('input', (e) => {
     const val = normalizeWord(e.target.value);
     e.target.value = val.toUpperCase();
-    // Синхронизируем слоты
     state.answer = val.split('');
     renderSlots();
   });
@@ -106,10 +128,8 @@ function init() {
     const slot = e.target.closest('.slot');
     if (!slot || !slot.dataset.index) return;
     const idx = Number(slot.dataset.index);
-    // Найти соответствующую букву в scrambled и вернуть
     const letter = state.answer[idx];
     if (!letter) return;
-    // Найти первую used букву с этой буквой
     for (let i = 0; i < state.scrambled.length; i++) {
       if (state.usedIndices.has(i) && state.scrambled[i] === letter) {
         state.usedIndices.delete(i);
@@ -144,6 +164,8 @@ function startGame() {
   state.score = 0;
   state.round = 0;
   state.wordsSolved = 0;
+  state.wrongAttempts = 0;
+  state.hintsUsed = 0;
   state.startTime = Date.now();
   startTimer();
   nextWord();
@@ -157,7 +179,6 @@ function nextWord() {
   }
   state.currentWord = state.words[state.round];
   state.scrambled = shuffle(state.currentWord.split(''));
-  // Гарантируем, что не совпадает с оригиналом
   let attempts = 0;
   while (state.scrambled.join('') === state.currentWord && attempts < 10) {
     state.scrambled = shuffle(state.currentWord.split(''));
@@ -167,7 +188,7 @@ function nextWord() {
   state.answer = [];
   state.round++;
   $('#round').textContent = state.round;
-  $('#score').textContent = state.score;
+  updateScoreDisplay();
   $('#answerInput').value = '';
   setFeedback('');
   renderLetters();
@@ -214,24 +235,6 @@ function addLetter(index) {
 }
 
 function reshuffle() {
-  // Сохраняем текущий ответ, перемешиваем только неиспользованные
-  const remaining = state.scrambled
-    .map((l, i) => ({ l, i }))
-    .filter(x => !state.usedIndices.has(x.i));
-  const shuffledRem = shuffle(remaining);
-  // Пересобираем scrambled с учётом used
-  const newScrambled = [...state.scrambled];
-  const newUsed = new Set();
-  let remIdx = 0;
-  for (let i = 0; i < newScrambled.length; i++) {
-    if (state.usedIndices.has(i)) {
-      // оставляем
-    } else {
-      newScrambled[i] = shuffledRem[remIdx].l;
-      remIdx++;
-    }
-  }
-  // Проще: просто перемешать всё заново и сбросить ответ
   state.scrambled = shuffle(state.currentWord.split(''));
   state.usedIndices = new Set();
   state.answer = [];
@@ -254,20 +257,24 @@ function checkAnswer() {
   const slots = $$('#answerSlots .slot');
   if (inputVal === state.currentWord) {
     // Успех
-    slots.forEach(s => s.classList.add('correct'));
-    setFeedback('✓ Верно!', 'success');
-    const points = state.length * 10;
+    const points = state.currentWord.length * POINTS.correctBase;
     state.score += points;
     state.wordsSolved++;
-    $('#score').textContent = state.score;
+    slots.forEach(s => s.classList.add('correct'));
+    setFeedback(`✓ Верно! +${points}`, 'success');
+    updateScoreDisplay();
     setTimeout(nextWord, 900);
   } else {
+    // Неверно — штраф
+    state.score += POINTS.wrong;
+    state.wrongAttempts++;
     slots.forEach(s => s.classList.add('wrong'));
-    setFeedback('✗ Неверно, попробуйте ещё', 'error');
+    setFeedback(`✗ Неверно ${POINTS.wrong}`, 'error');
+    updateScoreDisplay();
     setTimeout(() => {
       slots.forEach(s => s.classList.remove('wrong'));
       setFeedback('');
-    }, 600);
+    }, 700);
   }
 }
 
@@ -277,9 +284,14 @@ function skipWord() {
 }
 
 function showHint() {
+  // Штраф за подсказку
+  state.score += POINTS.hint;
+  state.hintsUsed++;
+  updateScoreDisplay();
+
   const word = state.currentWord;
   const revealed = word[0].toUpperCase() + '_'.repeat(word.length - 1);
-  setFeedback(`Подсказка: ${revealed}`, 'hint');
+  setFeedback(`Подсказка: ${revealed}  (${POINTS.hint})`, 'hint');
 }
 
 function startTimer() {
@@ -307,8 +319,15 @@ function endGame() {
   $('#finalScore').textContent = state.score;
   $('#wordsSolved').textContent = state.wordsSolved;
   $('#finalTime').textContent = formatTime(elapsed);
+
+  // Доп. статистика
+  const extra = document.getElementById('resultExtra');
+  if (extra) {
+    extra.textContent = `Ошибок: ${state.wrongAttempts} · Подсказок: ${state.hintsUsed}`;
+  }
+
   $('#resultTitle').textContent = state.wordsSolved >= state.maxRounds * 0.7 ? 'Отлично!' : 'Хорошая попытка!';
-  $('#resultMessage').textContent = `Вы угадали ${state.wordsSolved} из ${state.round} слов.`;
+  $('#resultMessage').textContent = `Вы угадали ${state.wordsSolved} из ${Math.min(state.round, state.maxRounds)} слов.`;
   showScreen('result');
 }
 

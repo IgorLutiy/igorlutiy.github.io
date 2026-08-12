@@ -431,3 +431,22 @@ select:hover, select:focus {
     width: 100%;
   }
 }
+
+/* Version badge */
+.version {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  background: #1e293b;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  -webkit-text-fill-color: var(--muted);
+}
+
+.result-extra {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}

@@ -12,7 +12,7 @@
 <body>
   <div class="app">
     <header class="header">
-      <h1 class="logo">🧩 Составь слово</h1>
+      <h1 class="logo">🧩 Составь слово <span id="gameVersion" class="version">v1.0</span></h1>
       <div class="controls">
         <select id="langSelect" aria-label="Язык"></select>
         <select id="lengthSelect" aria-label="Длина слова">
@@ -93,6 +93,7 @@
             <div>Слов: <strong id="wordsSolved">0</strong></div>
             <div>Время: <strong id="finalTime">0:00</strong></div>
           </div>
+          <p id="resultExtra" class="result-extra"></p>
           <div class="result-actions">
             <button id="playAgainBtn" class="btn primary">Играть снова</button>
             <button id="menuBtn" class="btn secondary">В меню</button>
@@ -102,7 +103,7 @@
     </main>
 
     <footer class="footer">
-      <p>* Составь слово из букв. IgorLutiy & Grok *</code></p>
+      <p>* Составь слово из букв. IgorLutiy & Grok *</code> · <span id="gameVersionFooter">v1.0</span></p>
     </footer>
   </div>
 

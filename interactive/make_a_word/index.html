@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Составь слово — игра из букв</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1 class="logo">🧩 Составь слово</h1>
+      <div class="controls">
+        <select id="langSelect" aria-label="Язык"></select>
+        <select id="lengthSelect" aria-label="Длина слова">
+          <option value="3">3 буквы</option>
+          <option value="4">4 буквы</option>
+          <option value="5" selected>5 букв</option>
+          <option value="6">6 букв</option>
+          <option value="7">7 букв</option>
+          <option value="8">8 букв</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Экран меню -->
+      <section id="menuScreen" class="screen active">
+        <div class="card hero">
+          <h2>Собери слово из перемешанных букв</h2>
+          <p>Выбери язык, длину слова и начни играть. Партия - 10 слов</p>
+          <button id="startBtn" class="btn primary">Начать игру</button>
+        </div>
+        <div class="stats-preview">
+          <div class="stat">
+            <span class="stat-value" id="totalWords">0</span>
+            <span class="stat-label">слов в словаре</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="bestScore">0</span>
+            <span class="stat-label">лучший счёт</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Игровой экран -->
+      <section id="gameScreen" class="screen">
+        <div class="game-header">
+          <div class="score-box">
+            <span class="label">Счёт</span>
+            <span id="score" class="value">0</span>
+          </div>
+          <div class="progress-box">
+            <span class="label">Раунд</span>
+            <span id="round" class="value">1</span>
+          </div>
+          <div class="timer-box">
+            <span class="label">Время</span>
+            <span id="timer" class="value">0:00</span>
+          </div>
+        </div>
+
+        <div class="letters-area">
+          <p class="hint">Составьте слово из этих букв:</p>
+          <div id="scrambledLetters" class="letters"></div>
+        </div>
+
+        <div class="answer-area">
+          <div id="answerSlots" class="slots"></div>
+          <input type="text" id="answerInput" class="answer-input" autocomplete="off" autocapitalize="characters" placeholder="или введите слово...">
+        </div>
+
+        <div class="actions">
+          <button id="checkBtn" class="btn primary">Проверить</button>
+          <button id="shuffleBtn" class="btn secondary">Перемешать</button>
+          <button id="skipBtn" class="btn ghost">Пропустить</button>
+          <button id="hintBtn" class="btn ghost">Подсказка</button>
+        </div>
+
+        <div id="feedback" class="feedback"></div>
+      </section>
+
+      <!-- Результат раунда -->
+      <section id="resultScreen" class="screen">
+        <div class="card result">
+          <h2 id="resultTitle">Отлично!</h2>
+          <p id="resultMessage"></p>
+          <div class="result-stats">
+            <div>Счёт: <strong id="finalScore">0</strong></div>
+            <div>Слов: <strong id="wordsSolved">0</strong></div>
+            <div>Время: <strong id="finalTime">0:00</strong></div>
+          </div>
+          <div class="result-actions">
+            <button id="playAgainBtn" class="btn primary">Играть снова</button>
+            <button id="menuBtn" class="btn secondary">В меню</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>* Составь слово из букв. IgorLutiy & Grok *</code></p>
+    </footer>
+  </div>
+
+  <script src="words.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,9 +1,9 @@
 const CACHE_NAME = 'make-a-word-v1';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/game.js',
+  './',
+  './index.html',
+  './style.css',
+  './game.js',
 ];
 
 self.addEventListener('install', (event) => {

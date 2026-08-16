@@ -4,6 +4,7 @@ const ASSETS = [
   './index.html',
   './style.css',
   './game.js',
+  './words.js',
 ];
 
 self.addEventListener('install', (event) => {

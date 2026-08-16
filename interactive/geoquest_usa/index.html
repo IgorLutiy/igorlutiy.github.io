@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#071e2b">
+<title>ГеоКвест · США — штаты и столицы</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Golos+Text:wght@400;500;700&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+
+<style>
+:root{
+  --ocean0:#071e2b; --ocean1:#0d3550;
+  --sand:#e8d5a3;  --sand-hi:#f7e9c3;
+  --ink:#122c3a;   --ink-soft:#3d6076;
+  --paper:#f6eed7; --paper2:#fff8e6;
+  --gold:#ffc857;  --gold-deep:#cf8b17;
+  --green:#2fce7f; --green-deep:#12824a;
+  --red:#ff5f56;   --red-deep:#a32014;
+  --sky:#8fd3f4;
+  --display:'Unbounded',system-ui,sans-serif;
+  --body:'Golos Text',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{font-family:var(--body);color:var(--paper);
+  background:
+    radial-gradient(1100px 600px at 75% -10%, #155a77 0%, transparent 60%),
+    linear-gradient(180deg, var(--ocean1), var(--ocean0) 70%);}
+.hidden{display:none!important}
+button{font-family:inherit}
+
+#map{position:fixed;inset:0;width:100%;height:100%;display:block;user-select:none;-webkit-user-select:none;cursor:grab}
+#map:active{cursor:grabbing}
+.vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
+  background:radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(3,14,21,.55) 100%)}
+
+/* ---------- ВЕРХНЯЯ ПАНЕЛЬ С ВКЛАДКАМИ ---------- */
+.topbar{position:fixed;top:0;left:0;right:0;height:54px;z-index:55;display:flex;align-items:center;gap:14px;
+  padding:0 16px;background:linear-gradient(180deg,rgba(7,26,37,.97),rgba(7,26,37,.9));
+  border-bottom:2px solid rgba(255,200,87,.3)}
+.logo{font:800 15px var(--display);letter-spacing:.04em;color:var(--gold);white-space:nowrap}
+.logo em{font-style:normal;color:var(--paper)}
+.tabs{display:flex;gap:6px;background:rgba(255,255,255,.07);padding:4px;border-radius:11px;margin-left:6px}
+.tab{padding:8px 18px;border-radius:8px;border:none;background:transparent;color:var(--sky);
+  font:700 13px var(--display);cursor:pointer;transition:.15s;white-space:nowrap}
+.tab:hover{color:var(--paper)}
+.tab.sel{background:var(--gold);color:var(--ink);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.topbar .sp{flex:1}
+
+/* ---------- HUD ИГРЫ ---------- */
+.hud{position:fixed;top:54px;left:0;right:0;z-index:30;display:flex;flex-wrap:wrap;gap:10px 18px;
+  align-items:center;padding:10px 18px;
+  background:linear-gradient(180deg,rgba(7,26,37,.95),rgba(7,26,37,.82));
+  border-bottom:2px solid rgba(255,200,87,.3);box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.hud-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chip{font:600 12px var(--mono);padding:6px 11px;border-radius:999px;border:1.5px solid rgba(143,211,244,.35);
+  color:var(--sky);display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.hud-q{flex:1;min-width:260px;text-align:center}
+.q-kicker{font:600 10.5px var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--sky);opacity:.85;margin-bottom:3px}
+.q-text{font:700 clamp(15px,2.5vw,27px) var(--display);line-height:1.25;color:var(--paper)}
+.q-text b{color:var(--gold);background:linear-gradient(transparent 58%, rgba(255,200,87,.3) 58%);padding:0 3px}
+.q-anim{animation:qin .45s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes qin{from{opacity:0;transform:translateY(-10px)}}
+.hud-right{display:flex;align-items:center;gap:10px}
+.timer{position:relative;width:48px;height:48px;flex:none}
+.timer svg{transform:rotate(-90deg)}
+.timer .bg{fill:none;stroke:#1c4356;stroke-width:4}
+.timer .fg{fill:none;stroke:var(--gold);stroke-width:4;stroke-linecap:round;transition:stroke .3s}
+.timer .secs{position:absolute;inset:0;display:grid;place-items:center;font:800 15px var(--mono);color:var(--paper)}
+.timer.danger .fg{stroke:var(--red)}
+.timer.danger .secs{color:var(--red);animation:blink .5s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+.score{font:800 16px var(--display);color:var(--ink);background:var(--gold);border:2px solid var(--ink);
+  border-radius:10px;padding:8px 13px;box-shadow:3px 3px 0 rgba(0,0,0,.4);display:flex;gap:7px;align-items:center;white-space:nowrap}
+.score.pop{animation:pop .35s}
+@keyframes pop{40%{transform:scale(1.18) rotate(-2deg)}}
+.iconbtn{width:38px;height:38px;border-radius:10px;border:2px solid rgba(255,200,87,.4);background:transparent;
+  color:var(--paper);font-size:16px;cursor:pointer;transition:.15s}
+.iconbtn:hover{background:rgba(255,200,87,.15);transform:translateY(-1px)}
+
+.zoomctrl{position:fixed;right:16px;bottom:18px;z-index:26;display:flex;flex-direction:column;gap:8px}
+.zoomctrl button{width:42px;height:42px;border-radius:11px;border:2px solid rgba(255,200,87,.45);
+  background:rgba(7,26,37,.85);color:var(--paper);font:800 19px var(--mono);cursor:pointer;transition:.15s}
+.zoomctrl button:hover{background:var(--gold);color:var(--ink);transform:translateY(-2px)}
+
+.compass{position:fixed;right:20px;top:70px;z-index:6;opacity:.35;pointer-events:none;animation:sway 9s ease-in-out infinite}
+@keyframes sway{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(24px);opacity:0;z-index:40;
+  pointer-events:none;padding:13px 24px;border-radius:12px;font:700 15px var(--body);max-width:min(92vw,620px);text-align:center;
+  background:#0c2c3d;border:2px solid var(--gold);transition:.25s}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:var(--green);color:#b9f6d5}
+#toast.bad{border-color:var(--red);color:#ffd9d5}
+#toast.info{border-color:var(--gold);color:#ffeab5}
+.floater{position:fixed;z-index:45;font:800 19px var(--display);color:var(--gold);
+  text-shadow:0 2px 0 var(--ink);pointer-events:none;animation:floatUp .9s ease-out forwards}
+@keyframes floatUp{to{transform:translateY(-52px);opacity:0}}
+
+/* ---------- КАРТА: ШТАТЫ / ПОДПИСИ / СТОЛИЦЫ ---------- */
+.land{stroke:#0e2f40;stroke-width:.8;transition:fill .25s,stroke .2s;transform-box:fill-box}
+.land.active{fill:var(--sand);cursor:pointer}
+.land.active:hover{fill:var(--sand-hi);stroke:var(--gold)}
+.land.dim{fill:#0f3547;stroke:#0b2737;pointer-events:none}
+.caps-on .land{pointer-events:none;cursor:default}
+.land.correct{fill:var(--green)!important;stroke:var(--green-deep)!important}
+.land.wrong{fill:var(--red)!important;stroke:var(--red-deep)!important;animation:shake .4s}
+.land.reveal{animation:revealPulse 1s ease-in-out 3}
+@keyframes revealPulse{0%,100%{fill:var(--sand)}50%{fill:var(--green)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+
+.cap{cursor:pointer}
+.cap .cin{transition:transform .15s;transform-box:fill-box;transform-origin:center}
+.cap:hover .cin{transform:scale(1.35)}
+.cap .hit{fill:transparent}
+.cap .star{fill:var(--gold);stroke:#6b4e0e;stroke-width:1.4;transition:fill .15s}
+.cap:hover .star{fill:#ffe08a}
+.cap.correct .star{fill:var(--green);stroke:var(--green-deep)}
+.cap.wrong .star{fill:var(--red);stroke:var(--red-deep)}
+.cap.reveal .cin{animation:capPulse .9s ease-in-out 3}
+@keyframes capPulse{50%{transform:scale(2.1)}}
+
+.lbl{pointer-events:none;text-anchor:middle;paint-order:stroke;stroke:rgba(246,238,215,.9);stroke-width:3px;font-family:var(--body)}
+.lbl .st{font-weight:700;font-size:12px;fill:var(--ink)}
+.lbl .cp{font-weight:600;font-size:9.5px;fill:#a06a10}
+
+/* ---------- ПАНЕЛЬ АТЛАСА ---------- */
+.atlas-panel{position:fixed;left:16px;top:68px;bottom:16px;width:296px;z-index:26;display:flex;flex-direction:column;
+  background:var(--paper);color:var(--ink);border-radius:14px;border:2px solid var(--ink);
+  box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden}
+.ap-head{padding:14px 16px 12px;border-bottom:2px dashed rgba(18,44,58,.25)}
+.ap-title{font:800 15px var(--display);display:flex;align-items:center;gap:8px}
+.ap-title .flag{font-size:18px}
+.ap-hint{font:500 11px var(--body);color:var(--ink-soft);margin:6px 0 10px;line-height:1.4}
+#apSearch{width:100%;font:600 14px var(--body);color:var(--ink);padding:9px 12px;border:2px solid var(--ink);
+  border-radius:9px;background:var(--paper2);outline:none}
+#apSearch:focus{box-shadow:0 0 0 3px rgba(255,200,87,.55)}
+.ap-list{overflow:auto;flex:1;padding:8px;scrollbar-width:thin}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;padding:8px 10px;border:none;
+  background:transparent;border-radius:8px;cursor:pointer;font:600 13.5px var(--body);color:var(--ink);text-align:left;transition:.12s}
+.row:hover{background:#ffeec2;transform:translateX(2px)}
+.row.sel{background:var(--ink);color:var(--paper)}
+.row span{color:var(--ink-soft);font-weight:500;font-size:12.5px;white-space:nowrap}
+.row.sel span{color:var(--sky)}
+.ap-info{padding:11px 14px;border-top:2px dashed rgba(18,44,58,.25);font:600 12px var(--mono);color:var(--ink-soft)}
+.ap-info b{color:var(--ink)}
+#apToggle{margin-left:auto;width:30px;height:30px;border-radius:8px;border:2px solid rgba(18,44,58,.35);
+  background:var(--paper2);cursor:pointer;font-size:14px;color:var(--ink)}
+.atlas-panel.closed .ap-list,.atlas-panel.closed .ap-info,.atlas-panel.closed .ap-hint,.atlas-panel.closed #apSearch{display:none}
+.atlas-panel.closed{bottom:auto}
+
+/* ---------- ОВЕРЛЕИ ---------- */
+.overlay{position:fixed;inset:54px 0 0;z-index:50;display:flex;align-items:center;justify-content:center;
+  background:rgba(5,20,30,.68);padding:22px;overflow:auto}
+.board{background:var(--paper);color:var(--ink);border-radius:14px;width:100%;max-width:920px;
+  box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 2px var(--ink);padding:34px 38px;position:relative}
+.board::before{content:'';position:absolute;inset:9px;border:2px dashed rgba(18,44,58,.25);border-radius:9px;pointer-events:none}
+.board::after{content:'ГЕО • США';position:absolute;top:18px;right:22px;font:800 11px var(--mono);
+  letter-spacing:.2em;color:var(--red-deep);border:3px double var(--red-deep);border-radius:6px;
+  padding:5px 9px;transform:rotate(-11deg);opacity:.55}
+.board-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:34px;position:relative;z-index:1}
+.kicker{font:600 10.5px var(--mono);letter-spacing:.28em;text-transform:uppercase;color:var(--ink-soft)}
+h1{font:900 clamp(36px,6vw,58px) var(--display);line-height:1;letter-spacing:.01em;margin:8px 0 10px}
+h1 span{color:var(--gold-deep)}
+.tagline{color:var(--ink-soft);font-size:15px;line-height:1.45;margin-bottom:18px}
+.steps{list-style:none;margin:0 0 20px;display:grid;gap:8px}
+.steps li{display:flex;gap:10px;align-items:baseline;font-size:14px}
+.steps b{flex:none;width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--paper);
+  font:800 12px var(--mono);display:inline-grid;place-items:center;transform:translateY(4px)}
+.field-label{font:600 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:7px}
+#nick{width:100%;font:700 17px var(--body);color:var(--ink);padding:12px 14px;border:2px solid var(--ink);
+  border-radius:10px;background:var(--paper2);outline:none;transition:.15s}
+#nick:focus{box-shadow:0 0 0 4px rgba(255,200,87,.55)}
+#nick.err{border-color:var(--red);animation:shake .4s}
+.btn-start{width:100%;margin-top:16px;font:800 17px var(--display);padding:16px;border-radius:12px;
+  border:2px solid var(--ink);background:var(--gold);color:var(--ink);box-shadow:5px 5px 0 var(--ink);
+  cursor:pointer;transition:.12s}
+.btn-start:hover{transform:translate(-2px,-2px);box-shadow:7px 7px 0 var(--ink)}
+.btn-start:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink)}
+.rulesline{margin-top:14px;font:600 11px var(--mono);letter-spacing:.06em;color:var(--ink-soft)}
+fieldset{border:none;margin-bottom:20px}
+legend{font:600 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px}
+.modes{display:grid;gap:10px}
+.mode-card{display:flex;gap:12px;align-items:flex-start;border:2px solid rgba(18,44,58,.25);border-radius:10px;
+  padding:13px 14px;cursor:pointer;background:var(--paper2);transition:.15s}
+.mode-card:hover{transform:translateY(-2px);border-color:var(--ink)}
+.mode-card.sel{border-color:var(--ink);box-shadow:4px 4px 0 var(--ink);background:#ffeec2}
+.mode-card .ico{font-size:24px;line-height:1}
+.mode-card b{display:block;font:700 15px var(--display)}
+.mode-card small{color:var(--ink-soft);font-size:12.5px}
+.mode-card input{display:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip-btn{border:2px solid rgba(18,44,58,.3);border-radius:999px;padding:8px 14px;font:600 13.5px var(--body);
+  background:var(--paper2);color:var(--ink);cursor:pointer;display:inline-flex;gap:8px;align-items:center;transition:.15s}
+.chip-btn i{width:10px;height:10px;border-radius:50%}
+.chip-btn:hover{transform:translateY(-2px);border-color:var(--ink)}
+.chip-btn.sel{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.credit{font:500 10px var(--mono);color:rgba(61,96,118,.7);margin-top:4px}
+
+.board.res{max-width:600px;text-align:center}
+.board.res h2{font:800 clamp(21px,3.4vw,30px) var(--display);margin:6px 0 22px}
+.bigscore{font:900 clamp(56px,10vw,84px) var(--display);color:var(--gold-deep);line-height:1}
+.bigscore small{font:700 22px var(--display);color:var(--ink-soft)}
+.resgrid{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:22px 0 6px}
+.stat{border:2px solid rgba(18,44,58,.25);border-radius:10px;padding:10px 16px;background:var(--paper2)}
+.stat b{display:block;font:800 20px var(--display)}
+.stat span{font:600 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.newrec{display:inline-block;margin:8px 0 4px;font:800 13px var(--mono);letter-spacing:.15em;color:var(--red-deep);
+  border:3px double var(--red-deep);border-radius:8px;padding:7px 14px;transform:rotate(-3deg);animation:pop .5s}
+.resbtns{display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.btn2{font:700 14px var(--display);padding:13px 22px;border-radius:11px;border:2px solid var(--ink);cursor:pointer;transition:.12s}
+.btn2.gold{background:var(--gold);color:var(--ink);box-shadow:4px 4px 0 var(--ink)}
+.btn2.plain{background:var(--paper2);color:var(--ink)}
+.btn2:hover{transform:translate(-2px,-2px)}
+.btn2:active{transform:translate(1px,1px);box-shadow:none}
+
+#loading,#errbox{z-index:70;inset:0}
+.loadcard{text-align:center;background:var(--paper);color:var(--ink);border-radius:14px;padding:30px 40px;box-shadow:0 0 0 2px var(--ink)}
+.spinner{width:38px;height:38px;margin:0 auto 14px;border-radius:50%;border:5px solid rgba(18,44,58,.2);
+  border-top-color:var(--gold-deep);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media (max-width:880px){
+  .board-grid{grid-template-columns:1fr;gap:24px}
+  .board{padding:26px 22px}
+  .board::after{display:none}
+  .compass{display:none}
+  .hud{padding:8px 10px;gap:8px 12px}
+  .hud-q{order:3;flex-basis:100%}
+  .atlas-panel{width:min(86vw,296px)}
+  .logo em{display:none}
+}
+</style>
+</head>
+<body>
+
+<svg id="map" viewBox="0 0 975 610" preserveAspectRatio="xMidYMid slice" aria-label="Карта США"></svg>
+<div class="vignette"></div>
+
+<svg class="compass" width="80" height="80" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="46" fill="none" stroke="#8fd3f4" stroke-width="2"/>
+  <circle cx="50" cy="50" r="34" fill="none" stroke="#8fd3f4" stroke-width="1" stroke-dasharray="2 5"/>
+  <path d="M50 10 L57 50 L50 90 L43 50 Z" fill="#ffc857"/>
+  <path d="M10 50 L50 43 L90 50 L50 57 Z" fill="#8fd3f4" opacity=".7"/>
+  <circle cx="50" cy="50" r="4" fill="#071e2b" stroke="#ffc857" stroke-width="2"/>
+</svg>
+
+<!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+<header class="topbar">
+  <div class="logo">✦ ГЕО<em>КВЕСТ</em> · США</div>
+  <nav class="tabs">
+    <button class="tab sel" id="tabGame">🎯 Игра</button>
+    <button class="tab" id="tabAtlas">🗺️ Атлас штатов</button>
+  </nav>
+  <div class="sp"></div>
+  <button class="iconbtn" id="sndBtn" title="Звук">🔊</button>
+</header>
+
+<!-- HUD ИГРЫ -->
+<header class="hud hidden" id="hud">
+  <div class="hud-left">
+    <div class="chip" id="hudNick">👤 —</div>
+    <div class="chip" id="hudRegion"><i></i><span>—</span></div>
+  </div>
+  <div class="hud-q" id="qWrap">
+    <div class="q-kicker" id="qKicker">Вопрос 1 из 10 · штаты</div>
+    <div class="q-text" id="qText">Найдите штат: <b>—</b></div>
+  </div>
+  <div class="hud-right">
+    <div class="timer" id="timerBox">
+      <svg width="48" height="48" viewBox="0 0 48 48">
+        <circle class="bg" cx="24" cy="24" r="17"/>
+        <circle class="fg" id="ring" cx="24" cy="24" r="17"/>
+      </svg>
+      <span class="secs" id="secs">30</span>
+    </div>
+    <div class="score" id="scoreBox">⭐ <b id="scoreVal">0</b></div>
+    <button class="iconbtn" id="quitBtn" title="Выйти в меню">✕</button>
+  </div>
+</header>
+
+<!-- ПАНЕЛЬ АТЛАСА -->
+<aside class="atlas-panel hidden" id="atlasPanel">
+  <div class="ap-head">
+    <div class="ap-title"><span class="flag">🇺</span> Атлас штатов
+      <button id="apToggle" title="Свернуть">–</button></div>
+    <p class="ap-hint">Кликайте по штату или выбирайте из списка. Приближайте карту — подписи мелких штатов появляются при увеличении.</p>
+    <input id="apSearch" placeholder="Поиск: штат или столица…" autocomplete="off">
+  </div>
+  <div class="ap-list" id="apList"></div>
+  <div class="ap-info" id="apInfo">Выберите штат — здесь появится справка.</div>
+</aside>
+
+<div class="zoomctrl hidden" id="zoomctrl">
+  <button id="zin" title="Приблизить">+</button>
+  <button id="zout" title="Отдалить">−</button>
+  <button id="zhome" title="Показать весь регион">⌂</button>
+</div>
+
+<div id="toast"></div>
+
+<!-- СТАРТОВЫЙ ЭКРАН -->
+<div class="overlay" id="intro">
+  <div class="board">
+    <div class="board-grid">
+      <div>
+        <div class="kicker">Тренажёр по географии США</div>
+        <h1>ШТАТЫ<span>★</span>И СТОЛИЦЫ</h1>
+        <p class="tagline">50 штатов, четыре региона и столицы — от Олимпии до Джуно.</p>
+        <ol class="steps">
+          <li><b>1</b>Назовите ник и выберите режим игры</li>
+          <li><b>2</b>Читайте вопрос вверху экрана</li>
+          <li><b>3</b>Кликайте по карте, пока не вышло время</li>
+        </ol>
+        <label class="field-label" for="nick">Ваш ник</label>
+        <input id="nick" maxlength="16" placeholder="Например, Колумб" autocomplete="off">
+        <button class="btn-start" id="start">Начать экспедицию →</button>
+        <p class="rulesline">⏱ 30 сек на вопрос &nbsp;·&nbsp; ⭐ +1 балл за верный ответ</p>
+      </div>
+      <div>
+        <fieldset>
+          <legend>Режим игры</legend>
+          <div class="modes" id="modes">
+            <label class="mode-card sel"><input type="radio" name="mode" value="state" checked>
+              <span class="ico">🗺️</span><span><b>Найди штат</b><small>Кликните по территории нужного штата</small></span></label>
+            <label class="mode-card"><input type="radio" name="mode" value="capital">
+              <span class="ico">📍</span><span><b>Найди столицу</b><small>Кликните по точке, где находится столица</small></span></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Регион</legend>
+          <div class="chips" id="regionChips"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Число вопросов</legend>
+          <div class="chips" id="roundChips"></div>
+        </fieldset>
+        <p class="credit">Границы штатов: U.S. Census Bureau (us-atlas)</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- РЕЗУЛЬТАТЫ -->
+<div class="overlay hidden" id="results">
+  <div class="board res">
+    <div class="kicker">Экспедиция завершена</div>
+    <h2 id="resHead">—</h2>
+    <div class="bigscore"><span id="resScore">0</span><small id="resTotal"> / 10</small></div>
+    <div class="resgrid">
+      <div class="stat"><b id="resAcc">0%</b><span>точность</span></div>
+      <div class="stat"><b id="resStreak">0</b><span>серия подряд</span></div>
+      <div class="stat"><b id="resBest">0</b><span>рекорд</span></div>
+    </div>
+    <div class="newrec hidden" id="newRec">🎉 НОВЫЙ РЕКОРД!</div>
+    <div class="resbtns">
+      <button class="btn2 gold" id="btnAgain">Ещё раз ↻</button>
+      <button class="btn2 plain" id="btnSetup">Изменить настройки</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="loading">
+  <div class="loadcard"><div class="spinner"></div><b>Загружаем карту США…</b></div>
+</div>
+<div class="overlay hidden" id="errbox">
+  <div class="loadcard">
+    <b>Не удалось загрузить карту 😕</b>
+    <p style="margin:10px 0;color:var(--ink-soft);font-size:14px">Проверьте подключение к интернету — данные карты подтягиваются из сети.</p>
+    <button class="btn2 gold" onclick="location.reload()">Попробовать снова</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= НАСТРОЙКИ ================= */
+const W = 975, H = 610;
+const QUESTION_TIME = 30;
+const USA_URL = 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json';
+
+/* Регионы США (по Бюро переписи). code — код в базе */
+const REGIONS = {
+  all:{name:'Вся страна',    color:'#8ecae6', code:null},
+  ne:  {name:'Северо-Восток',color:'#ffc857', code:'ne'},
+  mw:  {name:'Средний Запад',color:'#4cc9f0', code:'mw'},
+  so:  {name:'Юг',           color:'#ff6b5e', code:'so'},
+  we:  {name:'Запад',        color:'#2fce7f', code:'we'},
+};
+
+/* [FIPS, штат, столица, [долгота, широта], регион] */
+const RAW = [
+['01','Алабама','Монтгомери',[86.79,32.37],'so'], ['02','Аляска','Джуно',[-134.42,58.30],'we'],
+['04','Аризона','Финикс',[-112.07,33.45],'we'],  ['05','Арканзас','Литл-Рок',[-92.29,34.75],'so'],
+['06','Калифорния','Сакраменто',[-121.49,38.58],'we'], ['08','Колорадо','Денвер',[-104.99,39.74],'we'],
+['09','Коннектикут','Хартфорд',[-72.68,41.77],'ne'], ['10','Делавэр','Довер',[-75.52,39.16],'so'],
+['12','Флорида','Таллахаси',[-84.28,30.44],'so'], ['13','Джорджия','Атланта',[-84.39,33.75],'so'],
+['15','Гавайи','Гонолулу',[-157.86,21.31],'we'], ['16','Айдахо','Бойсе',[-116.20,43.62],'we'],
+['17','Иллинойс','Спрингфилд',[-89.65,39.78],'mw'], ['18','Индиана','Индианаполис',[-86.16,39.77],'mw'],
+['19','Айова','Де-Мойн',[-93.61,41.59],'mw'], ['20','Канзас','Топика',[-95.68,39.05],'mw'],
+['21','Кентукки','Франкфорт',[-84.87,38.20],'so'], ['22','Луизиана','Батон-Руж',[-91.15,30.45],'so'],
+['23','Мэн','Огаста',[-69.78,44.31],'ne'], ['24','Мэриленд','Аннаполис',[-76.49,38.98],'so'],
+['25','Массачусетс','Бостон',[-71.06,42.36],'ne'], ['26','Мичиган','Лансинг',[-84.55,42.73],'mw'],
+['27','Миннесота','Сент-Пол',[-93.09,44.95],'mw'], ['28','Миссисипи','Джексон',[-90.18,32.30],'so'],
+['29','Миссури','Джефферсон-Сити',[-92.17,38.58],'mw'], ['30','Монтана','Хелена',[-112.04,46.59],'we'],
+['31','Небраска','Линкольн',[-96.68,40.81],'mw'], ['32','Невада','Карсон-Сити',[-119.77,39.16],'we'],
+['33','Нью-Гэмпшир','Конкорд',[-71.54,43.21],'ne'], ['34','Нью-Джерси','Трентон',[-74.74,40.22],'ne'],
+['35','Нью-Мексико','Санта-Фе',[-105.94,35.69],'we'], ['36','Нью-Йорк','Олбани',[-73.76,42.65],'ne'],
+['37','Северная Каролина','Роли',[-78.64,35.78],'so'], ['38','Северная Дакота','Бисмарк',[-100.78,46.81],'mw'],
+['39','Огайо','Колумбус',[-83.00,39.96],'mw'], ['40','Оклахома','Оклахома-Сити',[-97.52,35.47],'so'],
+['41','Орегон','Сейлем',[-123.03,44.94],'we'], ['42','Пенсильвания','Гаррисберг',[-76.88,40.26],'ne'],
+['44','Род-Айленд','Провиденс',[-71.41,41.82],'ne'], ['45','Южная Каролина','Колумбия',[-81.03,34.00],'so'],
+['46','Южная Дакота','Пирр',[-100.35,44.37],'mw'], ['47','Теннесси','Нашвилл',[-86.78,36.16],'so'],
+['48','Техас','Остин',[-97.74,30.27],'so'], ['49','Юта','Солт-Лейк-Сити',[-111.89,40.76],'we'],
+['50','Вермонт','Монтпилиер',[-72.58,44.26],'ne'], ['51','Виргиния','Ричмонд',[-77.44,37.54],'so'],
+['53','Вашингтон','Олимпия',[-122.90,47.04],'we'], ['54','Западная Виргиния','Чарлстон',[-81.63,38.35],'so'],
+['55','Висконсин','Мадисон',[-89.40,43.07],'mw'], ['56','Вайоминг','Шайенн',[-104.82,41.14],'we'],
+];
+const DATA = {};
+RAW.forEach(r => DATA[r[0]] = {id:r[0], name:r[1], cap:r[2], ll:r[3], region:r[4]});
+/* ручные смещения подписей (Мичиган, Гавайи) */
+const LBL_OFF = {'26':[14,18], '15':[16,4]};
+
+/* ================= КАРТА ================= */
+const svg   = d3.select('#map');
+const gMap  = svg.append('g');
+const gLand = gMap.append('g');
+const gLbls = gMap.append('g').style('display','none');
+const gCaps = gMap.append('g').style('display','none');
+const gFx   = gMap.append('g');
+
+const projection = d3.geoAlbersUsa().scale(1300).translate([W/2, H/2]);
+const path = d3.geoPath(projection);
+
+let curK = 1, atlasOn = false;
+const zoom = d3.zoom().scaleExtent([1,60])
+  .translateExtent([[-W*.6,-H*.6],[W*1.6,H*1.6]])
+  .on('zoom', ev=>{
+    curK = ev.transform.k;
+    gMap.attr('transform', ev.transform);
+    capSel && capSel.attr('transform', d=>`translate(${d.px},${d.py}) scale(${1/curK})`);
+    lblSel && lblSel
+      .attr('transform', d=>`translate(${d.lx},${d.ly}) scale(${1/curK})`)
+      .style('display', d=>(atlasOn && d.area*curK*curK > 700) ? null : 'none');
+  });
+svg.call(zoom);
+
+function boundsOf(feats){
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  feats.forEach(f=>{ const b=path.bounds(f);
+    x0=Math.min(x0,b[0][0]); y0=Math.min(y0,b[0][1]);
+    x1=Math.max(x1,b[1][0]); y1=Math.max(y1,b[1][1]); });
+  return [[x0,y0],[x1,y1]];
+}
+function zoomToBounds(b, pad=.82, dur=1100){
+  const [[x0,y0],[x1,y1]]=b, dx=x1-x0, dy=y1-y0, cx=(x0+x1)/2, cy=(y0+y1)/2;
+  const k=Math.min(40, pad/Math.max(dx/W, dy/H));
+  const t=d3.zoomIdentity.translate(W/2-k*cx, H/2-k*cy).scale(k);
+  svg.transition().duration(dur).ease(d3.easeCubicInOut).call(zoom.transform, t);
+}
+const zoomIdentity = (dur=900)=>svg.transition().duration(dur).ease(d3.easeCubicInOut).call(zoom.transform, d3.zoomIdentity);
+
+/* ================= СОСТОЯНИЕ ================= */
+let land=null, capSel=null, lblSel=null, featById=null, capData=[], poolSet=new Set();
+let S=null, timerId=null, timeLeft=QUESTION_TIME, gen=0, view='menu',
+    soundOn=localStorage.getItem('gk_sound')!=='0';
+const CIRC = 2*Math.PI*17;
+const $ = id => document.getElementById(id);
+const PRAISE = ['Верно!','Точно в цель!','Отлично!','Есть!','Браво!'];
+function later(fn,ms){ const g=gen; setTimeout(()=>{ if(g===gen) fn(); }, ms); }
+
+function starPath(o,i,n=5){let s='';for(let k=0;k<2*n;k++){const r=k%2?i:o,a=Math.PI*k/n-Math.PI/2;
+  s+=(k?'L':'M')+(r*Math.cos(a)).toFixed(2)+','+(r*Math.sin(a)).toFixed(2);}return s+'Z';}
+const STAR = starPath(7,3);
+
+function build(feats){
+  featById = new Map(feats.map(f=>[f.id,f]));
+  land = gLand.selectAll('path').data(feats).join('path')
+    .attr('class', f=>DATA[f.id] ? 'land active' : 'land dim')
+    .attr('d',path).attr('vector-effect','non-scaling-stroke')
+    .on('click', onStateClick);
+
+  capData = Object.values(DATA).map(d=>{ const p=projection(d.ll)||[0,0]; return {...d, px:p[0], py:p[1]}; });
+
+  capSel = gCaps.selectAll('g.cap').data(capData, d=>d.id).join(enter=>{
+      const g = enter.append('g').attr('class','cap');
+      const cin = g.append('g').attr('class','cin');
+      cin.append('circle').attr('class','hit').attr('r',13);
+      cin.append('path').attr('class','star').attr('d',STAR);
+      return g;
+    })
+    .attr('transform',d=>`translate(${d.px},${d.py})`)
+    .on('click', onCapClick);
+
+  const lblData = capData.map(d=>{
+    const f = featById.get(d.id), c = path.centroid(f), off = LBL_OFF[d.id]||[0,0];
+    return {...d, lx:c[0]+off[0], ly:c[1]+off[1], area:Math.abs(path.area(f))};
+  });
+  lblSel = gLbls.selectAll('text').data(lblData, d=>d.id).join('text').attr('class','lbl');
+  lblSel.append('tspan').attr('class','st').attr('x',0).text(d=>d.name);
+  lblSel.append('tspan').attr('class','cp').attr('x',0).attr('dy','1.2em').text(d=>'★ '+d.cap);
+
+  buildAtlasList();
+  $('loading').classList.add('hidden');
+}
+
+d3.json(USA_URL)
+  .then(us => build(topojson.feature(us, us.objects.states).features))
+  .catch(()=>{ $('loading').classList.add('hidden'); $('errbox').classList.remove('hidden'); });
+
+/* ================= АТЛАС ================= */
+function buildAtlasList(){
+  const list = $('apList');
+  [...capData].sort((a,b)=>a.name.localeCompare(b.name,'ru')).forEach(d=>{
+    const b=document.createElement('button');
+    b.className='row'; b.dataset.id=d.id;
+    b.innerHTML=`<b>${d.name}</b><span>${d.cap}</span>`;
+    b.addEventListener('click',()=>selectState(d,true));
+    list.appendChild(b);
+  });
+  $('apSearch').addEventListener('input',e=>{
+    const q=e.target.value.trim().toLowerCase();
+    list.querySelectorAll('.row').forEach(r=>{
+      const d=DATA[r.dataset.id];
+      r.style.display=(d.name.toLowerCase().includes(q)||d.cap.toLowerCase().includes(q))?'':'none';
+    });
+  });
+  $('apToggle').addEventListener('click',()=>{
+    const p=$('atlasPanel'); p.classList.toggle('closed');
+    $('apToggle').textContent=p.classList.contains('closed')?'+':'–';
+  });
+}
+function selectState(d, fromList){
+  land.filter(f=>f.id===d.id).classed('reveal',true);
+  later(()=>land.filter(f=>f.id===d.id).classed('reveal',false), 1200);
+  const f=featById.get(d.id);
+  zoomToBounds(path.bounds(f), .5, 800);
+  $('apInfo').innerHTML=`<b>${d.name}</b> — столица: <b>${d.cap}</b>`;
+  document.querySelectorAll('.row').forEach(r=>r.classList.toggle('sel', r.dataset.id===d.id));
+  if(!fromList){
+    const row=document.querySelector(`.row[data-id="${d.id}"]`);
+    row && row.scrollIntoView({block:'nearest'});
+  }
+  tone(620,.06,'sine',.07);
+}
+
+/* ================= ВКЛАДКИ ================= */
+function setTabUI(t){
+  $('tabGame').classList.toggle('sel', t==='game');
+  $('tabAtlas').classList.toggle('sel', t==='atlas');
+}
+function enterAtlas(){
+  gen++; stopTimer(); S=null; view='atlas'; atlasOn=true; setTabUI('atlas');
+  resetLandClasses();
+  gLand.classed('caps-on',false);
+  gCaps.style('display',null); capSel.style('display',null);
+  gLbls.style('display',null);
+  $('intro').classList.add('hidden'); $('results').classList.add('hidden');
+  $('hud').classList.add('hidden');
+  $('atlasPanel').classList.remove('hidden'); $('zoomctrl').classList.remove('hidden');
+  zoomIdentity();
+  svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity);
+}
+function leaveAtlasToMenu(){
+  atlasOn=false; view='menu'; setTabUI('game');
+  gLbls.style('display','none'); gCaps.style('display','none');
+  $('atlasPanel').classList.add('hidden');
+  $('hud').classList.add('hidden'); $('results').classList.add('hidden');
+  $('intro').classList.remove('hidden');
+  resetLandClasses(); zoomIdentity();
+}
+function resetLandClasses(){
+  land.classed('active',f=>!!DATA[f.id]).classed('dim',f=>!DATA[f.id])
+      .classed('reveal',false).classed('correct',false).classed('wrong',false);
+  capSel.classed('reveal',false).classed('correct',false).classed('wrong',false);
+}
+$('tabAtlas').addEventListener('click', enterAtlas);
+$('tabGame').addEventListener('click', ()=>{ if(view==='atlas') leaveAtlasToMenu(); });
+
+/* ================= ЛОГИКА ИГРЫ ================= */
+function poolFor(region){
+  const code=(REGIONS[region]||{}).code;
+  return capData.filter(d=>!code || d.region===code);
+}
+function startGame(cfg){
+  if(view==='atlas'){ atlasOn=false; $('atlasPanel').classList.add('hidden'); }
+  const pool = poolFor(cfg.region);
+  if(!pool.length){ toast('В выбранном регионе нет штатов','bad',2200); return; }
+  gen++; view='game'; setTabUI('game');
+  S = {...cfg, pool, order:d3.shuffle(pool.slice()).slice(0, Math.min(cfg.rounds, pool.length)),
+       idx:0, score:0, streak:0, bestStreak:0, locked:true, flash:[]};
+  S.total = S.order.length;
+  poolSet = new Set(S.pool.map(d=>d.id));
+  land.classed('active',f=>poolSet.has(f.id)).classed('dim',f=>!poolSet.has(f.id))
+      .classed('reveal',false).classed('correct',false).classed('wrong',false);
+  capSel.classed('reveal',false).classed('correct',false).classed('wrong',false);
+  gLand.classed('caps-on', cfg.mode==='capital');
+  gCaps.style('display', cfg.mode==='capital'?null:'none');
+  capSel.style('display', d=>poolSet.has(d.id)?null:'none');
+  gLbls.style('display','none');
+  $('hudNick').textContent='👤 '+cfg.nick;
+  const rc=$('hudRegion'); rc.querySelector('span').textContent=REGIONS[cfg.region].name;
+  rc.querySelector('i').style.background=REGIONS[cfg.region].color;
+  $('scoreVal').textContent='0';
+  $('intro').classList.add('hidden'); $('results').classList.add('hidden');
+  $('hud').classList.remove('hidden'); $('zoomctrl').classList.remove('hidden');
+  const feats=S.pool.map(d=>featById.get(d.id));
+  cfg.region==='all' ? zoomIdentity(1100) : zoomToBounds(boundsOf(feats));
+  nextQuestion();
+}
+function clearFlash(){ if(S){ S.flash.forEach(([s,c])=>s.classed(c,false)); S.flash=[]; } }
+function nextQuestion(){
+  clearFlash();
+  if(S.idx>=S.total) return finish();
+  S.q=S.order[S.idx]; S.locked=false;
+  $('qKicker').textContent=`Вопрос ${S.idx+1} из ${S.total} · ${S.mode==='state'?'штаты':'столицы'} · ${REGIONS[S.region].name}`;
+  $('qText').innerHTML = S.mode==='state'
+    ? `Найдите штат: <b>${S.q.name}</b>`
+    : `Найдите столицу: <b>${S.q.cap}</b>`;
+  const qw=$('qWrap'); qw.classList.remove('q-anim'); void qw.offsetWidth; qw.classList.add('q-anim');
+  startTimer();
+}
+function revealCorrect(){
+  if(S.mode==='state'){
+    const f=featById.get(S.q.id);
+    if(f){ const s=land.filter(x=>x===f).classed('reveal',true); S.flash.push([s,'reveal']);
+           ripple(path.centroid(f),'#2fce7f'); }
+  } else {
+    const s=capSel.filter(d=>d.id===S.q.id).classed('reveal',true); S.flash.push([s,'reveal']);
+    ripple([S.q.px,S.q.py],'#2fce7f');
+  }
+}
+function onStateClick(ev,f){
+  if(ev.defaultPrevented) return;
+  if(view==='atlas'){ const d=DATA[f.id]; d && selectState(d,false); return; }
+  if(!S || S.locked || S.mode!=='state') return;
+  const d=DATA[f.id]; if(!d || !poolSet.has(f.id)) return;
+  f.id===S.q.id ? answerCorrect(d3.select(ev.currentTarget), d, ev)
+                : answerWrong(d3.select(ev.currentTarget), d, ev);
+}
+function onCapClick(ev,d){
+  if(ev.defaultPrevented) return;
+  if(view==='atlas'){ selectState(d,false); return; }
+  if(!S || S.locked || S.mode!=='capital' || !poolSet.has(d.id)) return;
+  d.id===S.q.id ? answerCorrect(d3.select(ev.currentTarget), d, ev)
+                : answerWrong(d3.select(ev.currentTarget), d, ev);
+}
+function answerCorrect(sel,d,ev){
+  S.locked=true; stopTimer();
+  sel.classed('correct',true); S.flash.push([sel,'correct']);
+  S.score++; S.streak++; S.bestStreak=Math.max(S.bestStreak,S.streak);
+  setScore(S.score);
+  ripple(d3.pointer(ev,gMap.node()),'#2fce7f');
+  floater('+1',ev.clientX,ev.clientY);
+  toast(PRAISE[Math.floor(Math.random()*PRAISE.length)]+'  +1 балл','ok',1100);
+  sOk();
+  later(()=>{ S.idx++; nextQuestion(); },900);
+}
+function answerWrong(sel,d,ev){
+  S.locked=true; stopTimer(); S.streak=0;
+  sel.classed('wrong',true); S.flash.push([sel,'wrong']);
+  const msg = S.mode==='state'
+    ? `Это ${d.name}. Правильный ответ: ${S.q.name}`
+    : `Это ${d.cap} — столица штата ${d.name}. Правильный ответ: ${S.q.cap}`;
+  sBad(); later(revealCorrect,420);
+  toast(msg,'bad',2300);
+  later(()=>{ S.idx++; nextQuestion(); },2150);
+}
+function onTimeout(){
+  if(!S || S.locked) return;
+  S.locked=true; stopTimer(); S.streak=0;
+  toast('Время вышло! Правильный ответ подсвечен','bad',1900);
+  revealCorrect(); sBad();
+  later(()=>{ S.idx++; nextQuestion(); },1900);
+}
+function finish(){
+  stopTimer(); S.locked=true;
+  const store=JSON.parse(localStorage.getItem('gkus_best')||'{}');
+  const key=`${S.nick}|${S.mode}|${S.region}`;
+  const prev=store[key]||0, isRec=S.score>prev;
+  if(isRec){ store[key]=S.score; localStorage.setItem('gkus_best',JSON.stringify(store)); }
+  $('resHead').textContent=`${S.nick}, экспедиция завершена!`;
+  $('resScore').textContent=S.score;
+  $('resTotal').textContent=' / '+S.total;
+  $('resAcc').textContent=(S.total?Math.round(100*S.score/S.total):0)+'%';
+  $('resStreak').textContent=S.bestStreak;
+  $('resBest').textContent=Math.max(prev,S.score);
+  $('newRec').classList.toggle('hidden',!isRec);
+  $('results').classList.remove('hidden');
+}
+function resetToMenu(){
+  gen++; stopTimer(); clearFlash(); S=null; view='menu'; atlasOn=false; setTabUI('game');
+  resetLandClasses();
+  gLand.classed('caps-on',false); gCaps.style('display','none'); gLbls.style('display','none');
+  $('hud').classList.add('hidden'); $('zoomctrl').classList.add('hidden');
+  $('atlasPanel').classList.add('hidden'); $('results').classList.add('hidden');
+  $('intro').classList.remove('hidden');
+  zoomIdentity();
+}
+
+/* ================= ТАЙМЕР ================= */
+function startTimer(){
+  stopTimer(); timeLeft=QUESTION_TIME; timerUI(); startTimer._w=null;
+  timerId=setInterval(()=>{
+    timeLeft-=.1;
+    const w=Math.ceil(timeLeft);
+    if(timeLeft<=5&&timeLeft>0&&w!==startTimer._w) tone(880,.03,'square',.05);
+    startTimer._w=w;
+    if(timeLeft<=0){ timeLeft=0; timerUI(); onTimeout(); return; }
+    timerUI();
+  },100);
+}
+function stopTimer(){ if(timerId) clearInterval(timerId), timerId=null; }
+function timerUI(){
+  $('secs').textContent=Math.ceil(timeLeft);
+  $('ring').style.strokeDasharray=CIRC;
+  $('ring').style.strokeDashoffset=CIRC*(1-timeLeft/QUESTION_TIME);
+  $('timerBox').classList.toggle('danger', timeLeft<=5&&timeLeft>0);
+}
+
+/* ================= ЭФФЕКТЫ ================= */
+function ripple(p,color){
+  gFx.append('circle').attr('cx',p[0]).attr('cy',p[1]).attr('r',3/curK)
+    .attr('fill','none').attr('stroke',color).attr('stroke-width',2.5/curK).style('opacity',.9)
+    .transition().duration(650).ease(d3.easeCubicOut)
+    .attr('r',46/curK).style('opacity',0).remove();
+}
+function floater(txt,x,y){
+  const d=document.createElement('div'); d.className='floater'; d.textContent=txt;
+  d.style.left=(x-14)+'px'; d.style.top=(y-30)+'px';
+  document.body.appendChild(d); setTimeout(()=>d.remove(),950);
+}
+function setScore(v){
+  $('scoreVal').textContent=v;
+  const b=$('scoreBox'); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+}
+let toastT=null;
+function toast(msg,kind='info',hold=1500){
+  const t=$('toast'); t.textContent=msg; t.className='show '+kind;
+  clearTimeout(toastT); toastT=setTimeout(()=>t.className='',hold);
+}
+let ac=null;
+function tone(f,d,type='sine',vol=.14,when=0){
+  if(!soundOn) return;
+  try{
+    ac ??= new (window.AudioContext||window.webkitAudioContext)();
+    const t=ac.currentTime+when,o=ac.createOscillator(),g=ac.createGain();
+    o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.02);
+    g.gain.exponentialRampToValueAtTime(.001,t+d);
+    o.connect(g).connect(ac.destination);o.start(t);o.stop(t+d+.05);
+  }catch(e){}
+}
+const sOk=()=>{ tone(660,.12,'triangle'); tone(990,.2,'triangle',.14,.12); };
+const sBad=()=>tone(160,.3,'sawtooth',.1);
+
+/* ================= UI ================= */
+const cur={mode:'state', region:'all', rounds:10};
+document.querySelectorAll('#modes .mode-card').forEach(card=>{
+  card.addEventListener('click',()=>{
+    document.querySelectorAll('#modes .mode-card').forEach(c=>c.classList.remove('sel'));
+    card.classList.add('sel'); card.querySelector('input').checked=true;
+    cur.mode=card.querySelector('input').value; tone(520,.05,'sine',.06);
+  });
+});
+function buildChips(box,items,onPick,initial){
+  items.forEach(([val,label,color])=>{
+    const b=document.createElement('button');
+    b.className='chip-btn'+(val===initial?' sel':'');
+    b.innerHTML=(color?`<i style="background:${color}"></i>`:'')+label;
+    b.addEventListener('click',()=>{
+      box.querySelectorAll('.chip-btn').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel'); onPick(val); tone(520,.05,'sine',.06);
+    });
+    box.appendChild(b);
+  });
+}
+buildChips($('regionChips'),[
+  ['ne','Северо-Восток',REGIONS.ne.color],
+  ['mw','Средний Запад',REGIONS.mw.color],
+  ['so','Юг',REGIONS.so.color],
+  ['we','Запад',REGIONS.we.color],
+  ['all','Вся страна',REGIONS.all.color],
+],v=>cur.region=v,'all');
+buildChips($('roundChips'),[[5,'5 вопросов'],[10,'10 вопросов'],[15,'15 вопросов']],v=>cur.rounds=v,10);
+
+$('nick').value=localStorage.getItem('gk_nick')||'';
+function tryStart(){
+  const nick=$('nick').value.trim();
+  if(!nick){ const n=$('nick'); n.classList.remove('err'); void n.offsetWidth; n.classList.add('err'); n.focus(); return; }
+  localStorage.setItem('gk_nick',nick);
+  tone(700,.1,'triangle');
+  startGame({nick,mode:cur.mode,region:cur.region,rounds:cur.rounds});
+}
+$('start').addEventListener('click',tryStart);
+$('nick').addEventListener('keydown',e=>{ if(e.key==='Enter') tryStart(); });
+$('btnAgain').addEventListener('click',()=>startGame({nick:S.nick,mode:S.mode,region:S.region,rounds:S.rounds}));
+$('btnSetup').addEventListener('click',resetToMenu);
+$('quitBtn').addEventListener('click',resetToMenu);
+
+const sndBtn=$('sndBtn');
+const syncSnd=()=>sndBtn.textContent=soundOn?'🔊':'🔇';
+syncSnd();
+sndBtn.addEventListener('click',()=>{ soundOn=!soundOn; localStorage.setItem('gk_sound',soundOn?'1':'0'); syncSnd(); });
+
+$('zin').addEventListener('click',()=>svg.transition().duration(280).call(zoom.scaleBy,1.6));
+$('zout').addEventListener('click',()=>svg.transition().duration(280).call(zoom.scaleBy,1/1.6));
+$('zhome').addEventListener('click',()=>{
+  if(view==='atlas') return zoomIdentity(700);
+  if(!S) return;
+  S.region==='all' ? zoomIdentity(700) : zoomToBounds(boundsOf(S.pool.map(d=>featById.get(d.id))),.82,700);
+});
+</script>
+</body>
+</html>
